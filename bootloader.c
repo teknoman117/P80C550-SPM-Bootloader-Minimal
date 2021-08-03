@@ -207,8 +207,7 @@ inline void action_flash_program_xmodem() {
         if (header == XMODEM_ETB) {
             break;
         } else if (header == XMODEM_EOT) {
-            putbyte(XMODEM_ACK);
-            continue;
+            break;
         } else if (header != XMODEM_SOH) {
             return;
         }
