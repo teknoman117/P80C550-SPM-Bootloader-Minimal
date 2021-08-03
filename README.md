@@ -24,3 +24,9 @@ boot: $(EXEC).bin
 	sx $(EXEC).bin >/dev/ttyUSB0 </dev/ttyUSB0
 	echo -n 'B' >/dev/ttyUSB0
 ```
+
+## Writing to a ROM
+```
+make bootloader.ihx
+minipro -p AT28C256 -f ihex -w bootloader.ihx
+```
