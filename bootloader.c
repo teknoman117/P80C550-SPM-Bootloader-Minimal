@@ -118,7 +118,7 @@ uint8_t getbyte() {
 }
 
 // erase the 64 KiB segment of the flash the program resides in
-inline void flash_erase() {
+void flash_erase(uint8_t full) {
     const uint16_t sector_erase_cycle1_address = 0x5555;
     const uint16_t sector_erase_cycle2_address = 0x2AAA;
     const uint16_t sector_erase_cycle3_address = 0x5555;
@@ -132,7 +132,8 @@ inline void flash_erase() {
     const uint8_t sector_erase_cycle6_data = 0x30;
 
     // erase 16x 4 KiB sectors
-    uint16_t sector = 0;
+    uint32_t sector = 0;
+    uint32_t sector_end = full ? 0x80000 : 0x10000;
     do {
         control.paged_memory_window = sector_erase_cycle1_address >> 13;
         expanded_memory[sector_erase_cycle1_address & 0x1FFF] = sector_erase_cycle1_data;
@@ -153,7 +154,8 @@ inline void flash_erase() {
         while ((b = expanded_memory[sector & 0x1FFF] & 0x40) ^ a) {
             a = b;
         }
-    } while ((sector += 0x1000));
+        sector += 0x1000;
+    } while (sector < sector_end);
 }
 
 inline void flash_write(uint16_t address, uint8_t data) {
@@ -184,13 +186,15 @@ inline void flash_write(uint16_t address, uint8_t data) {
     }
 }
 
-inline void action_flash_program_xmodem() {
+void action_flash_program_xmodem(uint8_t full) {
     __xdata uint8_t packet[128];
-    uint16_t address = 0;
-    uint16_t length = 0xFFFF;
+    uint32_t address = 0;
+    uint32_t length = full ? 0x80000 : 0x10000;
 
+#ifndef RAM
     // erase the flash
-    flash_erase();
+    flash_erase(full);
+#endif
 
     // wait for something
     uint16_t curtime = centiseconds;
@@ -249,7 +253,13 @@ inline void action_flash_program_xmodem() {
         for (i = 0; i < sizeof packet; i++) {
             if (length) {
                 length--;
+#ifndef RAM
                 flash_write(address++, packet[i]);
+#else
+                control.paged_memory_window = address >> 13;
+                expanded_memory[address & 0x1FFF] = packet[i];
+                address++;
+#endif
             }
         }
         putbyte(XMODEM_ACK);
@@ -377,7 +387,10 @@ void main(void) {
         // get command token
         switch (getbyte()) {
             case 'P':
-                action_flash_program_xmodem();
+                action_flash_program_xmodem(0);
+                break;
+            case 'I':
+                action_flash_program_xmodem(1);
                 break;
             case 'U':
                 action_flash_dump_xmodem(0);
